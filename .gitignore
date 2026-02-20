@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+bin/
+obj/
+
+# Config with secrets
+config/
+.env
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Installer binaries (too large for git — distribute via GitHub Releases)
+installer/output/
+installer/nodejs/node.exe
+
+# Temp
+*.tsbuildinfo
+*.log
