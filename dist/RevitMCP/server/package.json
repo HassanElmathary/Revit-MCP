@@ -1,0 +1,34 @@
+{
+  "name": "revit-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Revit with Google Gemini integration and 50+ tools",
+  "main": "build/index.js",
+  "type": "module",
+  "bin": {
+    "revit-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "clean": "rimraf build",
+    "prebuild": "npm run clean",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "keywords": ["revit", "mcp", "gemini", "bim", "automation"],
+  "author": "RevitMCP",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "@google/genai": "^1.0.0",
+    "zod": "^3.24.2",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.8.2"
+  }
+}
