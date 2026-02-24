@@ -163,50 +163,46 @@ namespace RevitMCPPlugin.Core
         {
             while (messageBuffer.Length > 0)
             {
-                var data = messageBuffer.ToString().TrimStart();
-                if (string.IsNullOrEmpty(data)) 
+                var data = messageBuffer.ToString();
+
+                // 1. Skip leading whitespace to find the start of the JSON object
+                int startIndex = 0;
+                while (startIndex < data.Length && char.IsWhiteSpace(data[startIndex]))
                 {
+                    startIndex++;
+                }
+
+                if (startIndex == data.Length)
+                {
+                    // Buffer contains only whitespace, clear it and wait for more data
                     messageBuffer.Clear();
                     break;
                 }
 
+                // 2. Identify the potential JSON object starting at startIndex
+                var remainingData = data.Substring(startIndex);
+
+                // Use brace counting to find the end of the object reliably.
+                // This handles nested objects correctly.
+                int objectLength = FindJsonObjectEnd(remainingData);
+
+                if (objectLength <= 0)
+                {
+                    // Incomplete JSON — wait for more data.
+                    // However, we can safely remove the leading whitespace we found to keep the buffer clean.
+                    if (startIndex > 0)
+                    {
+                        messageBuffer.Remove(0, startIndex);
+                    }
+                    break;
+                }
+
+                // 3. Extract and parse the JSON string
+                var jsonStr = remainingData.Substring(0, objectLength);
+
                 try
                 {
-                    // Try to parse one JSON object from the beginning of the string
-                    JObject request;
-                    int charsConsumed;
-
-                    using (var reader = new JsonTextReader(new System.IO.StringReader(data)))
-                    {
-                        request = JObject.Load(reader);
-                        // The reader's LinePosition after Load tells us char count consumed.
-                        // But more reliably, re-serialize and check length.
-                        // Simpler: find the end of this JSON object by parsing position.
-                        charsConsumed = (int)reader.LinePosition;
-                    }
-
-                    // Fallback: find the consumed portion by re-serializing the object size
-                    // This handles the edge case reliably:
-                    var serialized = request.ToString(Formatting.None);
-                    var idx = data.IndexOf(serialized, StringComparison.Ordinal);
-                    if (idx >= 0)
-                    {
-                        charsConsumed = idx + serialized.Length;
-                    }
-                    else
-                    {
-                        // If we can't find the exact match, use a brace-counting approach
-                        charsConsumed = FindJsonObjectEnd(data);
-                        if (charsConsumed <= 0) break; // Can't determine end, wait for more
-                    }
-
-                    // Remove processed data from buffer
-                    messageBuffer.Remove(0, data.Length - messageBuffer.Length + charsConsumed);
-                    messageBuffer.Clear();
-                    if (charsConsumed < data.Length)
-                    {
-                        messageBuffer.Append(data.Substring(charsConsumed));
-                    }
+                    var request = JObject.Parse(jsonStr);
 
                     // Process the request
                     var response = await ProcessRequest(request);
@@ -214,16 +210,15 @@ namespace RevitMCPPlugin.Core
                     var responseBytes = Encoding.UTF8.GetBytes(responseStr);
                     await stream.WriteAsync(responseBytes, 0, responseBytes.Length, ct);
                 }
-                catch (JsonReaderException)
-                {
-                    // Incomplete JSON — wait for more data
-                    break;
-                }
                 catch (Exception ex)
                 {
                     Logger.LogError("Error processing message", ex);
-                    break;
+                    // Even if processing fails (e.g. malformed JSON that passed brace counting),
+                    // we must consume the message to avoid an infinite loop.
                 }
+
+                // 4. Remove processed data (whitespace + object) from the buffer
+                messageBuffer.Remove(0, startIndex + objectLength);
             }
         }
 
